@@ -38,6 +38,34 @@ The scheduling engine in `pawpal_system.py` goes beyond a simple task list. Key 
 
 **Auto-generated tasks** — `Pet.get_care_requirements()` automatically adds a training session for dogs under 2 and a weekly weight check for cats over 10, and forces feeding tasks to be time-inflexible for pets with medical conditions.
 
+## Testing PawPal+
+
+### Running the tests
+
+```bash
+python -m pytest tests/test_pawpal.py -v
+```
+
+### What the tests cover
+
+The suite contains **22 tests** across five classes:
+
+| Class | Tests | What is verified |
+|---|---|---|
+| `TestCareTask` | 2 | `mark_complete` sets `is_completed`; `mark_incomplete` resets it |
+| `TestPet` | 2 | Tasks are stored on the pet and returned by `get_care_requirements` |
+| `TestOwner` | 2 | Pets are registered; tasks are aggregated across all pets |
+| `TestSorting` | 3 | `sort_by_time` orders tasks chronologically using `scheduled_start_minute`; falls back to parsing the time string when that field is `None`; correctly handles a midnight (00:00) task |
+| `TestRecurrence` | 6 | `mark_complete` sets `next_due_date` to +1 day (daily) or +7 days (weekly); `create_next_occurrence` returns a clean copy with all scheduling state reset, and `None` when the task was never completed; the scheduler excludes a task whose `next_due_date` is in the future and includes one whose `next_due_date` equals the target date |
+| `TestConflictDetection` | 6 | `detect_conflicts` flags overlapping intervals and returns `ConflictReport` objects classifying each clash as same-pet or cross-pet; adjacent tasks (A ends exactly when B starts) are not flagged; `add_task` rejects a new task that would overlap an existing one and leaves its `scheduled_start_minute` cleared; an empty plan produces no reports |
+| `TestScheduler` | 1 | `generate_daily_plan` returns a plan with the task scheduled and nothing in `unscheduled_tasks` when the task fits within the owner's availability |
+
+### Confidence level: ★★★★☆ (4 / 5)
+
+The core scheduling behaviors — priority ordering, conflict prevention during placement, recurring task filtering, and chronological sorting — are all exercised and passing. The main gap is that the two-pass greedy algorithm itself is only tested end-to-end through `test_generate_daily_plan` with a single task; edge cases like a full slot causing Pass 2 fallback, or a `twice_daily` task with fewer than two time windows, are not yet covered by dedicated tests.
+
+---
+
 ## Getting started
 
 ### Setup
