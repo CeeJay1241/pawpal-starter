@@ -1,6 +1,10 @@
 # PawPal+ Project Reflection
 
 ## 1. System Design
+## Core actions:
+- Add a a pet
+- Schedule a walk
+- Groom pet
 
 **a. Initial design**
 
