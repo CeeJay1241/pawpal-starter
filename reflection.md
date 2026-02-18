@@ -28,8 +28,10 @@
 **b. Tradeoffs**
 
 - Describe one tradeoff your scheduler makes.
-- Why is that tradeoff reasonable for this scenario?
+The scheduler uses a forward-only slot cursor for simplicity and speed, but sacrifices schedule density: time gaps left before fixed-window tasks are permanently wasted rather than filled by flexible lower-priority tasks.
 
+- Why is that tradeoff reasonable for this scenario?
+The greedy cursor is reasonable here because pet care tasks are few, biologically spaced, and have a fallback pass — so wasted gaps rarely cause a task to go unscheduled.
 ---
 
 ## 3. AI Collaboration

@@ -4,7 +4,7 @@ Demonstrates the pet care planning system.
 """
 
 from datetime import date
-from pawpal_system import Pet, CareTask, Owner, Scheduler
+from pawpal_system import Pet, CareTask, Owner, Scheduler, DailyPlan
 
 
 def main():
@@ -38,7 +38,29 @@ def main():
         medical_conditions=["senior joint care"]
     )
 
-    # Add tasks for Buddy
+    # Add tasks OUT OF ORDER to demonstrate sort_by_time -------------------
+
+    # Buddy: add evening tasks first, then morning tasks
+    evening_walk = CareTask(
+        task_type="walk",
+        name="Evening Walk",
+        duration_minutes=45,
+        priority=4,
+        frequency="daily",
+        preferred_time_windows=["18:00-20:00"],
+        notes="Longer walk to burn energy"
+    )
+
+    buddy_dinner = CareTask(
+        task_type="feed",
+        name="Buddy's Dinner",
+        duration_minutes=10,
+        priority=5,
+        frequency="daily",
+        preferred_time_windows=["17:30-18:30"],
+        is_time_flexible=False
+    )
+
     morning_walk = CareTask(
         task_type="walk",
         name="Morning Walk",
@@ -59,27 +81,7 @@ def main():
         is_time_flexible=False
     )
 
-    evening_walk = CareTask(
-        task_type="walk",
-        name="Evening Walk",
-        duration_minutes=45,
-        priority=4,
-        frequency="daily",
-        preferred_time_windows=["18:00-20:00"],
-        notes="Longer walk to burn energy"
-    )
-
-    # Add tasks for Whiskers
-    whiskers_breakfast = CareTask(
-        task_type="feed",
-        name="Whiskers' Breakfast",
-        duration_minutes=5,
-        priority=5,
-        frequency="daily",
-        preferred_time_windows=["07:00-08:00"],
-        is_time_flexible=False
-    )
-
+    # Whiskers: add medication first, then feeding, then play
     joint_medication = CareTask(
         task_type="medication",
         name="Joint Supplement",
@@ -88,6 +90,16 @@ def main():
         frequency="daily",
         preferred_time_windows=["08:00-09:00"],
         notes="Give with food",
+        is_time_flexible=False
+    )
+
+    whiskers_breakfast = CareTask(
+        task_type="feed",
+        name="Whiskers' Breakfast",
+        duration_minutes=5,
+        priority=5,
+        frequency="daily",
+        preferred_time_windows=["07:00-08:00"],
         is_time_flexible=False
     )
 
@@ -101,80 +113,143 @@ def main():
         notes="Feather toy or laser pointer"
     )
 
-    # Add tasks to pets
+    # Register tasks in the out-of-order sequence
+    buddy.add_care_task(evening_walk)      # evening before morning
+    buddy.add_care_task(buddy_dinner)
     buddy.add_care_task(morning_walk)
     buddy.add_care_task(buddy_breakfast)
-    buddy.add_care_task(evening_walk)
 
+    whiskers.add_care_task(joint_medication)   # medication before breakfast
     whiskers.add_care_task(whiskers_breakfast)
-    whiskers.add_care_task(joint_medication)
     whiskers.add_care_task(play_time)
 
-    # Add pets to owner
     owner.add_pet(buddy)
     owner.add_pet(whiskers)
 
-    # Create scheduler and generate plan
+    # Generate plan
     scheduler = Scheduler(owner)
     plan = scheduler.generate_daily_plan(date.today())
 
-    # Print Today's Schedule
+    # ------------------------------------------------------------------
+    # 1. Full schedule sorted by time (Scheduler.sort_by_time)
+    # ------------------------------------------------------------------
     print("=" * 60)
     print(f"TODAY'S SCHEDULE - {plan.date.strftime('%A, %B %d, %Y')}")
     print("=" * 60)
-    print(f"\nOwner: {owner.name}")
-    print(f"Pets: {', '.join([pet.name for pet in owner.pets])}")
-    print(f"Available Time: {owner.total_available_minutes} minutes")
-    print(f"  Time Slots: {', '.join(owner.available_time_slots)}")
+    print(f"Owner: {owner.name}  |  Pets: {', '.join(p.name for p in owner.pets)}")
+    print(f"Reasoning: {plan.reasoning}")
 
     print("\n" + "-" * 60)
-    print("TASKS TO COMPLETE")
+    print("ALL TASKS  (sorted by time via Scheduler.sort_by_time)")
     print("-" * 60)
+    for time_str, task in Scheduler.sort_by_time(plan.scheduled_tasks):
+        status = "[done]" if task.is_completed else "[todo]"
+        print(f"  {time_str}  {status}  {task.name:<30} ({task.duration_minutes}min, {task.pet_name})")
 
-    all_tasks = owner.get_all_care_tasks()
-
-    # Group tasks by pet
-    for pet in owner.pets:
-        pet_tasks = pet.get_care_requirements()
-        if pet_tasks:
-            print(f"\n{pet.name} ({pet.species.title()}):")
-            for task in pet_tasks:
-                priority_stars = "⭐" * task.priority
-                time_pref = task.preferred_time_windows[0] if task.preferred_time_windows else "Flexible"
-                flexible = "✓" if task.is_time_flexible else "✗"
-
-                print(f"  • {task.name}")
-                print(f"    Type: {task.task_type.title()} | Duration: {task.duration_minutes}min | Priority: {priority_stars}")
-                print(f"    Preferred Time: {time_pref} | Flexible: {flexible}")
-                if task.notes:
-                    print(f"    Notes: {task.notes}")
+    # ------------------------------------------------------------------
+    # 2. Filter by pet  (DailyPlan.filter_tasks)
+    # ------------------------------------------------------------------
+    print("\n" + "-" * 60)
+    print("BUDDY'S TASKS ONLY  (filter_tasks pet_name='Buddy')")
+    print("-" * 60)
+    for time_str, task in plan.filter_tasks(pet_name="Buddy"):
+        print(f"  {time_str}  {task.name} ({task.duration_minutes}min)")
 
     print("\n" + "-" * 60)
-    print("PLAN SUMMARY")
+    print("WHISKERS' TASKS ONLY  (filter_tasks pet_name='Whiskers')")
     print("-" * 60)
-    print(f"Total Tasks: {len(all_tasks)}")
-    print(f"Scheduled Tasks: {len(plan.scheduled_tasks)}")
-    print(f"Unscheduled Tasks: {len(plan.unscheduled_tasks)}")
-    print(f"Total Time Required: {sum(task.duration_minutes for task in all_tasks)} minutes")
-    print(f"\nReasoning: {plan.reasoning}")
+    for time_str, task in plan.filter_tasks(pet_name="Whiskers"):
+        print(f"  {time_str}  {task.name} ({task.duration_minutes}min)")
 
-    if plan.scheduled_tasks:
-        print("\n" + "-" * 60)
-        print("SCHEDULED TASKS")
-        print("-" * 60)
-        for time, task in sorted(plan.scheduled_tasks):
-            print(f"{time} - {task.name} ({task.duration_minutes}min)")
+    # ------------------------------------------------------------------
+    # 3. Mark some tasks complete, then filter by status
+    # ------------------------------------------------------------------
+    # Simulate completing the first two tasks of the day
+    sorted_all = Scheduler.sort_by_time(plan.scheduled_tasks)
+    for _, task in sorted_all[:2]:
+        task.mark_complete()
 
+    print("\n" + "-" * 60)
+    print("PENDING TASKS  (filter_tasks completed=False)")
+    print("-" * 60)
+    pending = plan.filter_tasks(completed=False)
+    if pending:
+        for time_str, task in pending:
+            print(f"  {time_str}  {task.name} ({task.pet_name})")
+    else:
+        print("  All done!")
+
+    print("\n" + "-" * 60)
+    print("COMPLETED TASKS  (filter_tasks completed=True)")
+    print("-" * 60)
+    for time_str, task in plan.filter_tasks(completed=True):
+        print(f"  {time_str}  {task.name} ({task.pet_name})")
+
+    # ------------------------------------------------------------------
+    # 4. Combined filter: Buddy's pending tasks
+    # ------------------------------------------------------------------
+    print("\n" + "-" * 60)
+    print("BUDDY'S PENDING TASKS  (filter_tasks pet_name='Buddy', completed=False)")
+    print("-" * 60)
+    for time_str, task in plan.filter_tasks(pet_name="Buddy", completed=False):
+        print(f"  {time_str}  {task.name}")
+
+    # ------------------------------------------------------------------
+    # 5. Unscheduled tasks
+    # ------------------------------------------------------------------
     if plan.unscheduled_tasks:
         print("\n" + "-" * 60)
-        print("TASKS PENDING SCHEDULING")
+        print("COULD NOT SCHEDULE")
         print("-" * 60)
         for task in sorted(plan.unscheduled_tasks, key=lambda t: t.priority, reverse=True):
-            print(f"  • {task.name} (Priority: {task.priority})")
+            print(f"  {task.name} (priority {task.priority}, {task.pet_name})")
+
+    # ------------------------------------------------------------------
+    # 6. Conflict detection demo
+    # The scheduler prevents conflicts during normal planning, so we inject
+    # overlapping tasks directly into a fresh DailyPlan to demonstrate
+    # that detect_conflicts catches both same-pet and cross-pet clashes.
+    # ------------------------------------------------------------------
+    print("\n" + "-" * 60)
+    print("CONFLICT DETECTION DEMO  (scheduler.detect_conflicts)")
+    print("-" * 60)
+
+    conflict_plan = DailyPlan(date=date.today())
+
+    # Same-pet conflict: two Buddy tasks both starting at 07:00
+    buddy_feed = CareTask(
+        task_type="feed", name="Buddy's Breakfast",
+        duration_minutes=10, priority=5, frequency="daily",
+        pet_name="Buddy", scheduled_start_minute=420,   # 07:00
+    )
+    buddy_walk = CareTask(
+        task_type="walk", name="Morning Walk",
+        duration_minutes=30, priority=4, frequency="daily",
+        pet_name="Buddy", scheduled_start_minute=420,   # 07:00 — overlaps!
+    )
+    # Cross-pet conflict: Whiskers task overlaps Buddy's walk (07:05)
+    whiskers_feed = CareTask(
+        task_type="feed", name="Whiskers' Breakfast",
+        duration_minutes=15, priority=5, frequency="daily",
+        pet_name="Whiskers", scheduled_start_minute=425,  # 07:05 — overlaps walk
+    )
+
+    # Inject directly, bypassing add_task's conflict guard, to simulate a
+    # broken plan and prove detect_conflicts catches it
+    conflict_plan.scheduled_tasks = [
+        ("07:00", buddy_feed),
+        ("07:00", buddy_walk),
+        ("07:05", whiskers_feed),
+    ]
+
+    conflicts = scheduler.detect_conflicts(conflict_plan)
+    if conflicts:
+        for report in conflicts:
+            print(f"  {report}")
+    else:
+        print("  No conflicts detected.")
 
     print("\n" + "=" * 60)
-    print("💡 TIP: Implement the scheduling algorithm to auto-schedule tasks!")
-    print("=" * 60)
 
 
 if __name__ == "__main__":
