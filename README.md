@@ -22,6 +22,23 @@ Your final app should:
 - Display the plan clearly (and ideally explain the reasoning)
 - Include tests for the most important scheduling behaviors
 
+## Features
+
+| Feature | How it works |
+|---|---|
+| **Two-pass greedy scheduling** | Tasks are sorted by priority score and placed into the owner's availability slots. Pass 1 respects each task's preferred time window; Pass 2 relaxes that constraint so high-priority tasks are never silently dropped. |
+| **Priority scoring** | `CareTask.get_priority_score()` computes `base_priority × 10`, adds `+20` for fixed-time tasks, and `+15` for medication tasks, ensuring critical care always schedules first. |
+| **Sorting by time** | `Scheduler.sort_by_time()` orders any task list chronologically by `scheduled_start_minute`; falls back to parsing the `HH:MM` time string when that field is `None`. |
+| **Conflict warnings** | `Scheduler.detect_conflicts()` scans the plan pairwise and returns `ConflictReport` objects that classify each time overlap as same-pet or cross-pet, without raising exceptions. |
+| **Daily recurrence** | `mark_complete(on_date)` sets `next_due_date` to `on_date + 1 day`; the scheduler skips any task whose `next_due_date` is in the future, so completed tasks reappear automatically the next day. |
+| **Twice-daily expansion** | Tasks with `frequency="twice_daily"` are split into separate AM and PM instances using `dataclasses.replace()`, each placed into its own time window. |
+| **Weekly recurrence** | Tasks with `frequency="weekly"` are pinned to a specific weekday via `scheduled_weekday` and skipped on all other days. `mark_complete` advances `next_due_date` by 7 days. |
+| **Auto-generated tasks** | `Pet.get_care_requirements()` automatically adds a daily training session for dogs under 2, a weekly weight check for cats over 10, and forces feeding tasks to be time-inflexible for pets with medical conditions. |
+| **Plan filtering** | `DailyPlan.filter_tasks(pet_name=..., completed=...)` filters the schedule by pet, completion status, or both simultaneously. |
+| **Mark done with recurrence** | The UI "Mark done" button calls `CareTask.mark_complete(on_date)`, sets `is_completed`, updates `next_due_date`, and triggers `st.rerun()` to refresh the schedule in place. |
+
+---
+
 ## Smarter Scheduling
 
 The scheduling engine in `pawpal_system.py` goes beyond a simple task list. Key features added:
@@ -63,6 +80,7 @@ The suite contains **22 tests** across five classes:
 ### Confidence level: ★★★★☆ (4 / 5)
 
 The core scheduling behaviors — priority ordering, conflict prevention during placement, recurring task filtering, and chronological sorting — are all exercised and passing. The main gap is that the two-pass greedy algorithm itself is only tested end-to-end through `test_generate_daily_plan` with a single task; edge cases like a full slot causing Pass 2 fallback, or a `twice_daily` task with fewer than two time windows, are not yet covered by dedicated tests.
+
 
 ---
 
